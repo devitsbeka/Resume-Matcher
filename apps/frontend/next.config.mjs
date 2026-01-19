@@ -8,6 +8,8 @@ const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000';
 const nextConfig = {
   experimental: {},
   async rewrites() {
+    // Note: Next.js API routes (app/api/*) take precedence over rewrites
+    // So /api/v1/health is handled by our API route, not proxied to backend
     return [
       // Proxy API requests to the backend
       {
