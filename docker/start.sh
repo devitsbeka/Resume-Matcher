@@ -101,11 +101,13 @@ fi
 
 # Check for Playwright browsers
 info "Checking Playwright browsers..."
-if [ -d "/root/.cache/ms-playwright" ] || [ -d "/home/appuser/.cache/ms-playwright" ]; then
-    status "Playwright browsers found"
+# PLAYWRIGHT_BROWSERS_PATH is set in Dockerfile to /app/.playwright-browsers
+PLAYWRIGHT_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/app/.playwright-browsers}"
+if [ -d "$PLAYWRIGHT_PATH" ] && [ "$(ls -A $PLAYWRIGHT_PATH 2>/dev/null)" ]; then
+    status "Playwright browsers found at $PLAYWRIGHT_PATH"
 else
     warn "Installing Playwright Chromium (this may take a moment)..."
-    cd /app/backend && python -m playwright install chromium 2>/dev/null || {
+    cd /app/backend && python -m playwright install chromium 2>&1 || {
         warn "Playwright installation had warnings (this is usually OK)"
     }
     status "Playwright setup complete"
@@ -137,10 +139,42 @@ echo ""
 info "Starting frontend server on port ${FRONTEND_PORT}..."
 cd /app/frontend
 
+# Verify frontend build exists
+if [ ! -d ".next" ]; then
+    error "Frontend build not found! Missing .next directory"
+    exit 1
+fi
+status "Frontend build verified"
+
 # Next.js uses the PORT env var automatically when running `next start`
 # We set it explicitly here for clarity
+info "Running: PORT=${FRONTEND_PORT} npm start"
 PORT=${FRONTEND_PORT} npm start &
 FRONTEND_PID=$!
+
+# Wait a moment for frontend to initialize
+sleep 3
+
+# Check if frontend process is still running
+if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
+    error "Frontend failed to start!"
+    exit 1
+fi
+
+# Wait for frontend to be ready (via the proxied health endpoint)
+echo ""
+info "Waiting for frontend to be ready..."
+for i in {1..60}; do
+    if curl -s http://localhost:${FRONTEND_PORT}/api/v1/health > /dev/null 2>&1; then
+        status "Frontend is ready and proxying to backend (PID: $FRONTEND_PID)"
+        break
+    fi
+    if [ $i -eq 60 ]; then
+        warn "Frontend health check timed out after 60 seconds"
+        warn "Continuing anyway - Railway health check will retry"
+    fi
+    sleep 1
+done
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -157,7 +191,7 @@ if [ -n "$RAILWAY_STATIC_URL" ]; then
 fi
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-info "Press Ctrl+C to stop"
+info "Application ready for health checks"
 echo ""
 
 # Wait for processes

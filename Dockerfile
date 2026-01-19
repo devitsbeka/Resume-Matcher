@@ -40,28 +40,51 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js from official binary distribution (more reliable than NodeSource)
-ARG NODE_VERSION=22.22.0
-RUN curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz \
+# Install Node.js from official binary distribution (architecture-aware)
+ARG NODE_VERSION=22.12.0
+RUN ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+        amd64) NODE_ARCH="x64" ;; \
+        arm64) NODE_ARCH="arm64" ;; \
+        *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    esac && \
+    curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz \
     | tar -xJ -C /usr/local --strip-components=1 \
     && npm --version && node --version
 
 WORKDIR /app
 
+# Create non-root user FIRST (before installing Playwright)
+RUN useradd -m -u 1000 appuser
+
+# Create directories with proper ownership
+RUN mkdir -p /app/backend/data && chown -R appuser:appuser /app
+
+# Set Playwright browsers path to a location accessible by appuser
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers
+
 # ============================================
 # Backend Setup
 # ============================================
-COPY apps/backend/pyproject.toml /app/backend/
-COPY apps/backend/app /app/backend/app
+COPY --chown=appuser:appuser apps/backend/pyproject.toml /app/backend/
+COPY --chown=appuser:appuser apps/backend/app /app/backend/app
 
 WORKDIR /app/backend
 
 # Install Python dependencies
 RUN pip install -e .
 
-# Install Playwright and its system dependencies (as root, before switching to appuser)
-# This automatically installs the correct dependencies for the current Debian version
-RUN python -m playwright install --with-deps chromium
+# Install Playwright system dependencies as root
+RUN python -m playwright install-deps chromium
+
+# Switch to appuser for Playwright browser installation
+USER appuser
+
+# Install Playwright browsers as appuser (so they're accessible at runtime)
+RUN python -m playwright install chromium
+
+# Switch back to root for remaining setup
+USER root
 
 # ============================================
 # Frontend Setup
@@ -69,29 +92,24 @@ RUN python -m playwright install --with-deps chromium
 WORKDIR /app/frontend
 
 # Copy built frontend from builder stage
-COPY --from=frontend-builder /app/frontend/.next ./.next
-COPY --from=frontend-builder /app/frontend/public ./public
-COPY --from=frontend-builder /app/frontend/package*.json ./
-COPY --from=frontend-builder /app/frontend/next.config.ts ./
+COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/.next ./.next
+COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/public ./public
+COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/package*.json ./
+COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/next.config.ts ./
 
 # Install production dependencies only
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && chown -R appuser:appuser node_modules
 
 # ============================================
 # Startup Script
 # ============================================
-COPY docker/start.sh /app/start.sh
+COPY --chown=appuser:appuser docker/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
-# ============================================
-# Data Directory & Volume
-# ============================================
-RUN mkdir -p /app/backend/data
+# Ensure all files are owned by appuser
+RUN chown -R appuser:appuser /app
 
-# Create a non-root user for security
-RUN useradd -m -u 1000 appuser \
-    && chown -R appuser:appuser /app
-
+# Switch to non-root user for security
 USER appuser
 
 # Expose ports (Railway uses PORT env var, but we expose both for local Docker use)
@@ -109,8 +127,8 @@ ENV PORT=3000 \
     CORS_ORIGINS="*"
 
 # Health check - uses the frontend port (which proxies to backend)
-# This works with Railway's single-port model
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Increased start-period for Railway's slower startup
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
     CMD curl -f http://localhost:${PORT:-3000}/api/v1/health || exit 1
 
 # Start the application
