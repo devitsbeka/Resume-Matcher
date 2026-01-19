@@ -10,6 +10,11 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
+# Railway/Cloud platform compatibility
+# Railway sets PORT env var for the public-facing port
+FRONTEND_PORT="${PORT:-3000}"
+BACKEND_PORT="8000"
+
 # Print banner
 print_banner() {
     echo -e "${CYAN}"
@@ -78,6 +83,12 @@ trap cleanup SIGTERM SIGINT SIGQUIT
 # Print banner
 print_banner
 
+# Display port configuration
+info "Port configuration:"
+echo -e "  Frontend port: ${FRONTEND_PORT} (public)"
+echo -e "  Backend port:  ${BACKEND_PORT} (internal)"
+echo ""
+
 # Check and create data directory
 info "Checking data directory..."
 DATA_DIR="/app/backend/data"
@@ -100,17 +111,17 @@ else
     status "Playwright setup complete"
 fi
 
-# Start backend
+# Start backend on internal port
 echo ""
-info "Starting backend server..."
+info "Starting backend server on port ${BACKEND_PORT}..."
 cd /app/backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+python -m uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} &
 BACKEND_PID=$!
 
 # Wait for backend to be ready
 info "Waiting for backend to be ready..."
 for i in {1..30}; do
-    if curl -s http://localhost:8000/api/v1/health > /dev/null 2>&1; then
+    if curl -s http://localhost:${BACKEND_PORT}/api/v1/health > /dev/null 2>&1; then
         status "Backend is ready (PID: $BACKEND_PID)"
         break
     fi
@@ -121,11 +132,14 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Start frontend
+# Start frontend on the public port (Railway's PORT or default 3000)
 echo ""
-info "Starting frontend server..."
+info "Starting frontend server on port ${FRONTEND_PORT}..."
 cd /app/frontend
-npm start &
+
+# Next.js uses the PORT env var automatically when running `next start`
+# We set it explicitly here for clarity
+PORT=${FRONTEND_PORT} npm start &
 FRONTEND_PID=$!
 
 echo ""
@@ -133,10 +147,14 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 status "Resume Matcher is running!"
 echo ""
-echo -e "  ${BOLD}Frontend:${NC}  http://localhost:3000"
-echo -e "  ${BOLD}Backend:${NC}   http://localhost:8000"
-echo -e "  ${BOLD}API Docs:${NC}  http://localhost:8000/docs"
+echo -e "  ${BOLD}Frontend:${NC}  http://localhost:${FRONTEND_PORT}"
+echo -e "  ${BOLD}Backend:${NC}   http://localhost:${BACKEND_PORT} (internal)"
+echo -e "  ${BOLD}API Docs:${NC}  http://localhost:${FRONTEND_PORT}/api/v1/docs (proxied)"
 echo ""
+if [ -n "$RAILWAY_STATIC_URL" ]; then
+    echo -e "  ${BOLD}Railway URL:${NC} ${RAILWAY_STATIC_URL}"
+    echo ""
+fi
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 info "Press Ctrl+C to stop"

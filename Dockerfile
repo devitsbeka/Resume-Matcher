@@ -1,5 +1,6 @@
 # Resume Matcher Docker Image
 # Multi-stage build for optimized image size
+# Optimized for Railway deployment (single container with both services)
 
 # ============================================
 # Stage 1: Build Frontend
@@ -17,8 +18,8 @@ RUN npm ci
 # Copy frontend source
 COPY apps/frontend/ ./
 
-# Set environment variable for production build
-ENV NEXT_PUBLIC_API_URL=http://localhost:8000
+# No NEXT_PUBLIC_API_URL needed - we use relative URLs with Next.js rewrites
+# The frontend proxies API requests to the backend internally
 
 # Build the frontend
 RUN npm run build
@@ -115,7 +116,7 @@ USER appuser
 # Install Playwright Chromium as appuser (so browsers are in correct location)
 RUN python -m playwright install chromium
 
-# Expose ports
+# Expose ports (Railway uses PORT env var, but we expose both for local Docker use)
 EXPOSE 3000 8000
 
 # Volume for persistent data
@@ -124,9 +125,15 @@ VOLUME ["/app/backend/data"]
 # Set working directory
 WORKDIR /app
 
-# Health check (endpoint is at /api/v1/health per backend router configuration)
+# Default environment variables for Railway compatibility
+# These can be overridden at runtime
+ENV PORT=3000 \
+    CORS_ORIGINS="*"
+
+# Health check - uses the frontend port (which proxies to backend)
+# This works with Railway's single-port model
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD curl -f http://localhost:${PORT:-3000}/api/v1/health || exit 1
 
 # Start the application
 CMD ["/app/start.sh"]

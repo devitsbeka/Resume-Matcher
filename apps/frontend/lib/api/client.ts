@@ -2,10 +2,20 @@
  * Centralized API Client
  *
  * Single source of truth for API configuration and base fetch utilities.
+ *
+ * Uses relative URLs to work with Next.js rewrites, which proxy /api/v1/*
+ * to the backend. This allows the app to work in any environment without
+ * build-time URL configuration.
  */
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-export const API_BASE = `${API_URL}/api/v1`;
+// For server-side operations that need the full backend URL (e.g., PDF generation)
+export const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// For client-side API calls - uses relative URLs that go through Next.js rewrites
+export const API_BASE = '/api/v1';
+
+// Legacy export for backwards compatibility
+export const API_URL = BACKEND_URL;
 
 /**
  * Standard fetch wrapper with common error handling.

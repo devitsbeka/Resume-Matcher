@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Backend URL for rewrites - in production containers, backend runs on localhost:8000
+// For external backend deployments, set BACKEND_INTERNAL_URL
+const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -9,9 +11,15 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      // Proxy API requests to the backend
+      {
+        source: '/api/v1/:path*',
+        destination: `${BACKEND_URL}/api/v1/:path*`,
+      },
+      // Legacy rewrite (kept for backwards compatibility)
       {
         source: '/api_be/:path*',
-        destination: `${API_URL}/:path*`,
+        destination: `${BACKEND_URL}/:path*`,
       },
     ];
   },

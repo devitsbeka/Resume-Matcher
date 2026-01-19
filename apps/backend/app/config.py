@@ -1,9 +1,11 @@
 """Application configuration using pydantic-settings."""
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -84,8 +86,6 @@ def _get_llm_api_key_with_fallback() -> str:
 
     Priority: Environment variable > config.json > empty string
     """
-    import os
-
     # First check environment variable
     env_key = os.environ.get("LLM_API_KEY", "")
     if env_key:
@@ -129,13 +129,29 @@ class Settings(BaseSettings):
     # Server Configuration
     host: str = "0.0.0.0"
     port: int = 8000
-    frontend_base_url: str = "http://localhost:3000"
+    # Frontend URL for PDF generation - set to deployed URL in production
+    frontend_base_url: str = os.environ.get(
+        "FRONTEND_BASE_URL", "http://localhost:3000"
+    )
 
-    # CORS Configuration
+    # CORS Configuration - can be set via CORS_ORIGINS env var as comma-separated list
+    # Use "*" to allow all origins (useful for Railway/container deployments)
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> list[str]:
+        """Parse CORS origins from comma-separated string or list."""
+        if isinstance(v, str):
+            # Handle comma-separated string from environment variable
+            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+            return origins if origins else ["*"]
+        if isinstance(v, list):
+            return v
+        return ["*"]
 
     # Paths
     data_dir: Path = Path(__file__).parent.parent / "data"
