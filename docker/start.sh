@@ -94,7 +94,7 @@ info "Environment:"
 echo -e "  USER: $(whoami)"
 echo -e "  PWD: $(pwd)"
 echo -e "  NODE_ENV: ${NODE_ENV:-not set}"
-echo -e "  CORS_ORIGINS: ${CORS_ORIGINS:-not set}"
+echo -e "  CORS_ORIGINS_STR: ${CORS_ORIGINS_STR:-not set}"
 echo ""
 
 # Debug: Check Node.js and Python

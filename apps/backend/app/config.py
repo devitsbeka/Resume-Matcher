@@ -134,24 +134,19 @@ class Settings(BaseSettings):
         "FRONTEND_BASE_URL", "http://localhost:3000"
     )
 
-    # CORS Configuration - can be set via CORS_ORIGINS env var as comma-separated list
+    # CORS Configuration - set via CORS_ORIGINS_STR env var as comma-separated list
     # Use "*" to allow all origins (useful for Railway/container deployments)
-    cors_origins: list[str] = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ]
+    # NOTE: Using str type to avoid pydantic-settings JSON parsing issues with list[str]
+    cors_origins_str: str = "http://localhost:3000,http://127.0.0.1:3000"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: Any) -> list[str]:
-        """Parse CORS origins from comma-separated string or list."""
-        if isinstance(v, str):
-            # Handle comma-separated string from environment variable
-            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
-            return origins if origins else ["*"]
-        if isinstance(v, list):
-            return v
-        return ["*"]
+    @property
+    def cors_origins(self) -> list[str]:
+        """Get CORS origins as a list, parsing from comma-separated string."""
+        raw = self.cors_origins_str
+        if raw == "*":
+            return ["*"]
+        origins = [o.strip() for o in raw.split(",") if o.strip()]
+        return origins if origins else ["*"]
 
     # Paths
     data_dir: Path = Path(__file__).parent.parent / "data"

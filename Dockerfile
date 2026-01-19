@@ -124,7 +124,7 @@ WORKDIR /app
 # Default environment variables for Railway compatibility
 # These can be overridden at runtime
 ENV PORT=3000 \
-    CORS_ORIGINS="*"
+    CORS_ORIGINS_STR="*"
 
 # Health check - uses the frontend port (which proxies to backend)
 # Increased start-period for Railway's slower startup
