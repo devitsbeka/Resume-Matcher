@@ -119,8 +119,8 @@ RUN python -m playwright install chromium
 # Expose ports (Railway uses PORT env var, but we expose both for local Docker use)
 EXPOSE 3000 8000
 
-# Volume for persistent data
-VOLUME ["/app/backend/data"]
+# Note: For persistent data on Railway, attach a volume via the Railway dashboard
+# pointing to /app/backend/data (Railway doesn't support VOLUME in Dockerfile)
 
 # Set working directory
 WORKDIR /app
