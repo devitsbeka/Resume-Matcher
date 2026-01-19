@@ -36,29 +36,8 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     NODE_ENV=production
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Node.js for frontend
-    curl \
-    # Playwright dependencies
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libatspi2.0-0 \
-    libgtk-3-0 \
-    # Cleanup
+# Install curl and Node.js first
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 22.x
@@ -79,8 +58,9 @@ WORKDIR /app/backend
 # Install Python dependencies
 RUN pip install -e .
 
-# Install Playwright system dependencies (as root)
-RUN python -m playwright install-deps chromium 2>/dev/null || true
+# Install Playwright and its system dependencies (as root, before switching to appuser)
+# This automatically installs the correct dependencies for the current Debian version
+RUN python -m playwright install --with-deps chromium
 
 # ============================================
 # Frontend Setup
@@ -112,9 +92,6 @@ RUN useradd -m -u 1000 appuser \
     && chown -R appuser:appuser /app
 
 USER appuser
-
-# Install Playwright Chromium as appuser (so browsers are in correct location)
-RUN python -m playwright install chromium
 
 # Expose ports (Railway uses PORT env var, but we expose both for local Docker use)
 EXPOSE 3000 8000
