@@ -36,14 +36,15 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     NODE_ENV=production
 
-# Install curl and Node.js first
+# Install curl (needed for health checks)
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 22.x
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Copy Node.js from the builder stage (more reliable than NodeSource)
+COPY --from=frontend-builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=frontend-builder /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=frontend-builder /usr/local/bin/npx /usr/local/bin/npx
+COPY --from=frontend-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 WORKDIR /app
 
