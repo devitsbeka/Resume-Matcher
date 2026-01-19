@@ -36,15 +36,15 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     NODE_ENV=production
 
-# Install curl (needed for health checks)
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+# Install curl (needed for health checks) and ca-certificates for Node.js download
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Node.js from the builder stage (more reliable than NodeSource)
-COPY --from=frontend-builder /usr/local/bin/node /usr/local/bin/node
-COPY --from=frontend-builder /usr/local/bin/npm /usr/local/bin/npm
-COPY --from=frontend-builder /usr/local/bin/npx /usr/local/bin/npx
-COPY --from=frontend-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+# Install Node.js from official binary distribution (more reliable than NodeSource)
+ARG NODE_VERSION=22.22.0
+RUN curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz \
+    | tar -xJ -C /usr/local --strip-components=1 \
+    && npm --version && node --version
 
 WORKDIR /app
 
