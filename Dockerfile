@@ -95,7 +95,7 @@ WORKDIR /app/frontend
 COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/.next ./.next
 COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/public ./public
 COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/package*.json ./
-COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/next.config.ts ./
+COPY --from=frontend-builder --chown=appuser:appuser /app/frontend/next.config.mjs ./
 
 # Install production dependencies only
 RUN npm ci --omit=dev && chown -R appuser:appuser node_modules

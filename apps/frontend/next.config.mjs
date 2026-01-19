@@ -1,14 +1,12 @@
-import type { NextConfig } from 'next';
+// @ts-check
 
 // Backend URL for rewrites - in production containers, backend runs on localhost:8000
 // For external backend deployments, set BACKEND_INTERNAL_URL
 const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000';
 
-const nextConfig: NextConfig = {
-  /* config options here */
-  experimental: {
-    turbopackUseSystemTlsCerts: true,
-  },
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {},
   async rewrites() {
     return [
       // Proxy API requests to the backend

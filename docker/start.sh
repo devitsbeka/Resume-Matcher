@@ -89,6 +89,21 @@ echo -e "  Frontend port: ${FRONTEND_PORT} (public)"
 echo -e "  Backend port:  ${BACKEND_PORT} (internal)"
 echo ""
 
+# Debug: Show environment
+info "Environment:"
+echo -e "  USER: $(whoami)"
+echo -e "  PWD: $(pwd)"
+echo -e "  NODE_ENV: ${NODE_ENV:-not set}"
+echo -e "  CORS_ORIGINS: ${CORS_ORIGINS:-not set}"
+echo ""
+
+# Debug: Check Node.js and Python
+info "Runtime versions:"
+echo -e "  Node.js: $(node --version 2>&1 || echo 'NOT FOUND')"
+echo -e "  npm: $(npm --version 2>&1 || echo 'NOT FOUND')"
+echo -e "  Python: $(python --version 2>&1 || echo 'NOT FOUND')"
+echo ""
+
 # Check and create data directory
 info "Checking data directory..."
 DATA_DIR="/app/backend/data"
@@ -146,20 +161,27 @@ if [ ! -d ".next" ]; then
 fi
 status "Frontend build verified"
 
-# Next.js uses the PORT env var automatically when running `next start`
-# We set it explicitly here for clarity
-info "Running: PORT=${FRONTEND_PORT} npm start"
-PORT=${FRONTEND_PORT} npm start &
+# List contents for debugging
+info "Frontend directory contents:"
+ls -la
+
+# Export PORT for Next.js (it reads from env var)
+export PORT=${FRONTEND_PORT}
+
+# Start Next.js directly using npx (more reliable than npm start)
+info "Running: npx next start -p ${FRONTEND_PORT}"
+npx next start -p ${FRONTEND_PORT} 2>&1 &
 FRONTEND_PID=$!
 
 # Wait a moment for frontend to initialize
-sleep 3
+sleep 5
 
 # Check if frontend process is still running
 if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
-    error "Frontend failed to start!"
+    error "Frontend failed to start! Check logs above for errors."
     exit 1
 fi
+status "Frontend process started (PID: $FRONTEND_PID)"
 
 # Wait for frontend to be ready (via the proxied health endpoint)
 echo ""
