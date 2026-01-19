@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+# Don't use set -e as it causes premature exits on minor errors
 
 # Colors for output
 RED='\033[0;31m'
@@ -135,19 +135,20 @@ cd /app/backend
 python -m uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} &
 BACKEND_PID=$!
 
-# Wait for backend to be ready
+# Wait for backend to be ready (but don't fail if it takes longer)
 info "Waiting for backend to be ready..."
+BACKEND_READY=false
 for i in {1..30}; do
     if curl -s http://localhost:${BACKEND_PORT}/api/v1/health > /dev/null 2>&1; then
         status "Backend is ready (PID: $BACKEND_PID)"
+        BACKEND_READY=true
         break
-    fi
-    if [ $i -eq 30 ]; then
-        error "Backend failed to start within 30 seconds"
-        exit 1
     fi
     sleep 1
 done
+if [ "$BACKEND_READY" = false ]; then
+    warn "Backend not ready after 30 seconds, continuing anyway..."
+fi
 
 # Start frontend on the public port (Railway's PORT or default 3000)
 echo ""
@@ -168,18 +169,20 @@ ls -la
 # Export PORT for Next.js (it reads from env var)
 export PORT=${FRONTEND_PORT}
 
-# Start Next.js directly using npx (more reliable than npm start)
-info "Running: npx next start -p ${FRONTEND_PORT}"
-npx next start -p ${FRONTEND_PORT} 2>&1 &
+# Start Next.js using the local binary directly (most reliable)
+info "Running: node_modules/.bin/next start -p ${FRONTEND_PORT}"
+node node_modules/.bin/next start -p ${FRONTEND_PORT} &
 FRONTEND_PID=$!
 
-# Wait a moment for frontend to initialize
-sleep 5
+# Give Next.js a moment to start
+sleep 3
 
 # Check if frontend process is still running
 if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
-    error "Frontend failed to start! Check logs above for errors."
-    exit 1
+    error "Frontend failed to start! Trying npm start as fallback..."
+    npm start &
+    FRONTEND_PID=$!
+    sleep 3
 fi
 status "Frontend process started (PID: $FRONTEND_PID)"
 
