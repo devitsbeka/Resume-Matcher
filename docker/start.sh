@@ -149,15 +149,36 @@ info "Backend started with PID: $BACKEND_PID"
 info "Waiting for backend to be ready..."
 BACKEND_READY=false
 for i in {1..30}; do
-    if curl -s http://localhost:${BACKEND_PORT}/api/v1/health > /dev/null 2>&1; then
+    # Check if backend process is still running
+    if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+        error "Backend process died! PID $BACKEND_PID is no longer running."
+        break
+    fi
+    
+    # Try to connect to backend
+    HEALTH_RESPONSE=$(curl -s -w "\n%{http_code}" http://localhost:${BACKEND_PORT}/api/v1/health 2>&1)
+    HTTP_CODE=$(echo "$HEALTH_RESPONSE" | tail -1)
+    
+    if [ "$HTTP_CODE" = "200" ]; then
         status "Backend is ready (PID: $BACKEND_PID)"
         BACKEND_READY=true
         break
     fi
+    
+    if [ $((i % 5)) -eq 0 ]; then
+        info "Waiting for backend... (attempt $i/30, last response: $HTTP_CODE)"
+    fi
     sleep 1
 done
+
 if [ "$BACKEND_READY" = false ]; then
-    warn "Backend not ready after 30 seconds, continuing anyway..."
+    warn "Backend not ready after 30 seconds"
+    # Check if process is still running
+    if kill -0 "$BACKEND_PID" 2>/dev/null; then
+        warn "Backend process is running (PID: $BACKEND_PID) but not responding to health checks"
+    else
+        error "Backend process has stopped"
+    fi
 fi
 
 # Start frontend on the public port (Railway's PORT or default 3000)
