@@ -132,8 +132,18 @@ fi
 echo ""
 info "Starting backend server on port ${BACKEND_PORT}..."
 cd /app/backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} &
+
+# Verify backend files exist
+if [ ! -f "app/main.py" ]; then
+    error "Backend main.py not found!"
+    ls -la app/ || echo "app/ directory not found"
+fi
+
+# Start uvicorn with output visible
+info "Running: python -m uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT}"
+python -m uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} 2>&1 &
 BACKEND_PID=$!
+info "Backend started with PID: $BACKEND_PID"
 
 # Wait for backend to be ready (but don't fail if it takes longer)
 info "Waiting for backend to be ready..."

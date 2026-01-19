@@ -8,14 +8,14 @@
  * build-time URL configuration.
  */
 
-// For server-side operations that need the full backend URL (e.g., PDF generation)
-export const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 // For client-side API calls - uses relative URLs that go through Next.js rewrites
 export const API_BASE = '/api/v1';
 
-// Legacy export for backwards compatibility
-export const API_URL = BACKEND_URL;
+// Display URL for error messages (user-friendly, not internal)
+export const API_URL = '/api/v1';
+
+// For server-side operations that need the full backend URL (internal container use only)
+export const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000';
 
 /**
  * Standard fetch wrapper with common error handling.
